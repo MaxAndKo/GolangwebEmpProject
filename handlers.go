@@ -50,7 +50,7 @@ func showEmps(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := db.Query("SELECT * FROM employees")
 	if err != nil {
-		log.Fatal(err)
+		log.Println("Ошибка чтения работников")
 	}
 
 	for rows.Next() {
