@@ -114,8 +114,8 @@ func createEmp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	row := db.QueryRow(fmt.Sprintf("INSERT INTO passports VALUES ('%s', '%s', %d)", emp.EmpPassport.Number, emp.EmpPassport.Type, id))
-	if row.Err() != nil {
+	_, err = db.Exec(fmt.Sprintf("INSERT INTO passports VALUES ('%s', '%s', %d)", emp.EmpPassport.Number, emp.EmpPassport.Type, id))
+	if err != nil {
 		log.Println("Ошибка при добавлении паспорта")
 		http.Error(w, "Неправильный формат тела запроса", 420)
 		return
@@ -139,8 +139,8 @@ func removeEmp(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	row := db.QueryRow(fmt.Sprintf("DELETE INTO employees WHERE id = %d", id))
-	if row.Err() != nil {
+	_, err = db.Exec(fmt.Sprintf("DELETE INTO employees WHERE id = %d", id))
+	if err != nil {
 		log.Println("Ошибка при удалении рабочего")
 		http.NotFound(w, r)
 	} else {
@@ -204,16 +204,16 @@ func updateEmp(w http.ResponseWriter, r *http.Request) {
 
 	query := fmt.Sprintf("UPDATE employees SET name = '%s', surname = '%s', phone = '%s', company_id = %d, department = '%s' WHERE id = %d",
 		oldEmp.Name, oldEmp.Surname, oldEmp.Phone, oldEmp.CompanyId, oldEmp.EmpDepartment.Name, oldEmp.Id)
-	row := db.QueryRow(query)
-	if row.Err() != nil {
+	_, err = db.Exec(query)
+	if err != nil {
 		log.Println(err)
 	}
 
 	if isNewPassport {
 		query := fmt.Sprintf("UPDATE passports SET passport_number = '%s', passport_type = '%s' WHERE employee_id = %d",
 			oldEmp.EmpPassport.Number, oldEmp.EmpPassport.Type, oldEmp.Id)
-		row := db.QueryRow(query)
-		if row.Err() != nil {
+		_, err := db.Exec(query)
+		if err != nil {
 			log.Println(err)
 		}
 	}
@@ -228,12 +228,7 @@ func readEmp(id int) (emp Employee, err error) {
 	}
 	defer db.Close()
 
-	row := db.QueryRow(fmt.Sprintf("SELECT * FROM employees WHERE id = %d", id))
-	if row.Err() != nil {
-		return
-	}
-
-	err = row.Scan(&emp.Id, &emp.Name, &emp.Surname, &emp.Phone, &emp.CompanyId, &emp.EmpDepartment.Name)
+	err = db.QueryRow(fmt.Sprintf("SELECT * FROM employees WHERE id = %d", id)).Scan(&emp.Id, &emp.Name, &emp.Surname, &emp.Phone, &emp.CompanyId, &emp.EmpDepartment.Name)
 	if err != nil {
 		return
 	}
