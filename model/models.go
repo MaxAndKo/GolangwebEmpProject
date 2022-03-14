@@ -1,4 +1,4 @@
-package main
+package model
 
 type Employee struct {
 	Id            int

@@ -1,38 +1,55 @@
-package main
+package controller
 
 import (
+	"database/sql"
+	"empProject/model"
 	"encoding/json"
 	"fmt"
+	_ "github.com/lib/pq"
+	"html/template"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 )
 
-func home(w http.ResponseWriter, r *http.Request) {
+func ConnectDB() (db *sql.DB, err error) {
+	db, err = sql.Open("postgres", os.Getenv("DATABASE_URL"))
+	return
+}
+
+func Home(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
 	}
-	w.Write([]byte("Домашняя страница"))
+	temp, err := template.ParseFiles("web/home_page.html")
+	if err != nil {
+		log.Println("Ошибка парсинга домашней страницы")
+		http.Error(w, "Ошибка веб приложения", 500)
+		return
+	}
+	temp.Execute(w, nil)
 }
 
-func showEmp(w http.ResponseWriter, r *http.Request) {
+func ShowEmp(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.URL.Query().Get("id"))
 	if err != nil || id < 1 {
-		http.NotFound(w, r)
+		http.Error(w, "Работника с таким id не существует", 404)
 		return
 	}
 
 	emp, err := readEmp(id)
 	if err != nil {
 		log.Println("Ошибка чтения работника")
-		http.NotFound(w, r)
+		http.Error(w, "Работника с таким id не существует", 404)
 	} else {
 		j, err := json.Marshal(emp)
 		if err != nil {
 			log.Println("Ошибка преобразования объекта работника")
+			http.Error(w, "Ошибка преобразования в json", 400)
 		}
 
 		w.Write([]byte(j))
@@ -40,11 +57,14 @@ func showEmp(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func showEmps(w http.ResponseWriter, r *http.Request) {
+func ShowEmps(w http.ResponseWriter, r *http.Request) {
 
-	db, err := connectDB()
+	db, err := ConnectDB()
 	if err != nil {
-		log.Fatal("Ошибка открытия соединения с БД")
+		log.Println("Ошибка открытия соединения с БД")
+		http.Error(w, "Ошибка соединения приложения с БД", 500)
+		db.Close()
+		return
 	}
 	defer db.Close()
 
@@ -56,24 +76,30 @@ func showEmps(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for rows.Next() {
-		var emp Employee
+		var emp model.Employee
 		err = rows.Scan(&emp.Id, &emp.Name, &emp.Surname, &emp.Phone, &emp.CompanyId, &emp.EmpDepartment.Name)
 		if err != nil {
-			log.Fatal(err)
+			log.Println("Ошибка преобразования работника")
+			http.Error(w, "Внутрення ошибка сервера", 500)
+			return
 		}
 
 		query := fmt.Sprintf("SELECT * FROM departments WHERE name = '%s'", emp.EmpDepartment.Name)
 
 		err = db.QueryRow(query).Scan(&emp.EmpDepartment.Name, &emp.EmpDepartment.Phone)
 		if err != nil {
-			log.Fatal(err)
+			log.Println("Ошибка чтения департамента")
+			http.Error(w, "Внутрення ошибка сервера", 500)
+			return
 		}
 
 		query = fmt.Sprintf("SELECT * FROM passports WHERE employee_id = %d", emp.Id)
 
 		err = db.QueryRow(query).Scan(&emp.EmpPassport.Number, &emp.EmpPassport.Type, &emp.Id)
 		if err != nil {
-			log.Fatal(err)
+			log.Println("Ошибка чтения паспорта")
+			http.Error(w, "Внутрення ошибка сервера", 500)
+			return
 		}
 
 		j, err := json.Marshal(emp)
@@ -86,7 +112,7 @@ func showEmps(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func createEmp(w http.ResponseWriter, r *http.Request) {
+func CreateEmp(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", http.MethodPost)
 		http.Error(w, "Метод запрещен", 405)
@@ -96,15 +122,29 @@ func createEmp(w http.ResponseWriter, r *http.Request) {
 	emp, err := jsonToEmp(r.Body)
 	if err != nil {
 		log.Println("Ошибка преобразования тела запроса в объект работника")
-		http.Error(w, "Неправильный формат тела запроса", 420)
+		http.Error(w, "Неправильный формат тела запроса", 400)
+		return
+	}
+	if !checkEmp(emp) {
+		log.Println("Ошибка заполнения тела запроса")
+		http.Error(w, "Ошибка заполнения тела запроса", 400)
 		return
 	}
 
-	db, err := connectDB()
+	db, err := ConnectDB()
 	if err != nil {
-		log.Fatal("Ошибка открытия соединения с БД")
+		log.Println("Ошибка открытия соединения с БД")
+		http.Error(w, "Ошибка соединения приложения с БД", 500)
+		db.Close()
+		return
 	}
 	defer db.Close()
+
+	if !checkPassport(emp.EmpPassport.Number, db) {
+		log.Println("Работник с таким паспортом уже существует")
+		http.Error(w, "Работник с таким паспортом уже существует", 400)
+		return
+	}
 
 	var id int
 	query := fmt.Sprintf("INSERT INTO employees(name, surname, phone, company_id, department) VALUES ('%s', '%s', '%s', %d, '%s') RETURNING id",
@@ -112,7 +152,7 @@ func createEmp(w http.ResponseWriter, r *http.Request) {
 	err = db.QueryRow(query).Scan(&id)
 	if err != nil {
 		log.Println(err)
-		http.Error(w, "Неправильный формат тела запроса", 420)
+		http.Error(w, "Неправильный формат тела запроса", 400)
 		return
 	}
 
@@ -126,9 +166,10 @@ func createEmp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write([]byte(fmt.Sprintf("Зарегестрирован рабочий c id %d", id)))
+
 }
 
-func removeEmp(w http.ResponseWriter, r *http.Request) {
+func RemoveEmp(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.URL.Query().Get("id"))
 	if err != nil || id < 1 {
 		http.NotFound(w, r)
@@ -137,9 +178,12 @@ func removeEmp(w http.ResponseWriter, r *http.Request) {
 
 	//fmt.Fprintf(w, "Удаление работника с ID %d\n", id)
 
-	db, err := connectDB()
+	db, err := ConnectDB()
 	if err != nil {
-		log.Fatal("Ошибка открытия соединения с БД")
+		log.Println("Ошибка открытия соединения с БД")
+		http.Error(w, "Ошибка соединения приложения с БД", 500)
+		db.Close()
+		return
 	}
 	defer db.Close()
 
@@ -147,14 +191,14 @@ func removeEmp(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Print("Ошибка при удалении рабочего: ")
 		log.Println(err)
-		http.NotFound(w, r)
+		http.Error(w, "Работника с таким id не существует", 404)
 	} else {
 		fmt.Fprintf(w, "Рабочий был успешно удален")
 	}
 
 }
 
-func updateEmp(w http.ResponseWriter, r *http.Request) {
+func UpdateEmp(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", http.MethodPost)
 		http.Error(w, "Метод запрещен", 405)
@@ -175,35 +219,38 @@ func updateEmp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if newEmp.Name != "" && oldEmp.Name != newEmp.Name {
+	if newEmp.Name != "" {
 		oldEmp.Name = newEmp.Name
 	}
 
-	if newEmp.Surname != "" && oldEmp.Surname != newEmp.Surname {
+	if newEmp.Surname != "" {
 		oldEmp.Surname = newEmp.Surname
 	}
 
-	if newEmp.Phone != "" && oldEmp.Phone != newEmp.Phone {
+	if newEmp.Phone != "" {
 		oldEmp.Phone = newEmp.Phone
 	}
 
-	if newEmp.CompanyId != 0 && oldEmp.CompanyId != newEmp.CompanyId {
+	if newEmp.CompanyId != 0 {
 		oldEmp.CompanyId = newEmp.CompanyId
 	}
 
 	isNewPassport := false
-	if newEmp.EmpPassport.Number != "" && oldEmp.EmpPassport.Number != newEmp.EmpPassport.Number {
+	if newEmp.EmpPassport.Number != "" {
 		oldEmp.EmpPassport = newEmp.EmpPassport
 		isNewPassport = true
 	}
 
-	if newEmp.EmpDepartment.Name != "" && oldEmp.EmpDepartment.Name != newEmp.EmpDepartment.Name {
+	if newEmp.EmpDepartment.Name != "" {
 		oldEmp.EmpDepartment.Name = newEmp.EmpDepartment.Name
 	}
 
-	db, err := connectDB()
+	db, err := ConnectDB()
 	if err != nil {
-		log.Fatal("Ошибка открытия соединения с БД")
+		log.Println("Ошибка открытия соединения с БД")
+		http.Error(w, "Ошибка соединения приложения с БД", 500)
+		db.Close()
+		return
 	}
 	defer db.Close()
 
@@ -212,6 +259,8 @@ func updateEmp(w http.ResponseWriter, r *http.Request) {
 	_, err = db.Exec(query)
 	if err != nil {
 		log.Println(err)
+		http.Error(w, "Ошибка приложения", 500)
+		return
 	}
 
 	if isNewPassport {
@@ -220,16 +269,18 @@ func updateEmp(w http.ResponseWriter, r *http.Request) {
 		_, err := db.Exec(query)
 		if err != nil {
 			log.Println(err)
+			http.Error(w, "Ошибка приложения", 500)
+			return
 		}
 	}
 
 	w.Write([]byte("Рабочий успешно обновлен"))
 }
 
-func readEmp(id int) (emp Employee, err error) {
-	db, err := connectDB()
+func readEmp(id int) (emp model.Employee, err error) {
+	db, err := ConnectDB()
 	if err != nil {
-		log.Fatal("Ошибка открытия соединения с БД")
+		return
 	}
 	defer db.Close()
 
@@ -255,7 +306,7 @@ func readEmp(id int) (emp Employee, err error) {
 	return
 }
 
-func jsonToEmp(r io.Reader) (emp Employee, err error) {
+func jsonToEmp(r io.Reader) (emp model.Employee, err error) {
 	bodyBytes, err := ioutil.ReadAll(r)
 	if err != nil {
 		return
@@ -266,4 +317,25 @@ func jsonToEmp(r io.Reader) (emp Employee, err error) {
 		return
 	}
 	return
+}
+
+func checkPassport(number string, db *sql.DB) bool {
+	query := fmt.Sprintf("SELECT * FROM passports WHERE passport_number = '%s'", number)
+
+	var passportType string
+	var id int
+	err := db.QueryRow(query).Scan(&number, &passportType, &id)
+	if err != nil {
+		return true
+	} else {
+		return false
+	}
+
+}
+
+func checkEmp(emp model.Employee) bool {
+	if emp.Name == "" || emp.Surname == "" || emp.CompanyId == 0 || emp.Phone == "" || emp.EmpDepartment.Name == "" || emp.EmpPassport.Number == "" || emp.EmpPassport.Type == "" {
+		return false
+	}
+	return true
 }

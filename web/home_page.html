@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Home</title>
+    <style>
+        body{
+            text-align: center;
+            font-family: Arial;
+        }
+        table{
+            margin: auto;
+            border-collapse: collapse;
+            text-align: center;
+        }
+        tr, td{
+            border: 1px solid black
+        }
+    </style>
+
+</head>
+<body>
+
+<p>Домашняя страница</p>
+<p>
+    <table>
+    <tr><td>any method</td><td>/employee?id={empId}</td><td>Выводит работника с данным id</td></tr>
+    <tr><td>any method</td><td>/employee/list  </td><td>Выводит псписок всех работников</td></tr>
+    <tr><td>post method</td><td>/employee/create</td><td>Создает нового работника из информации<br> в теле запроса в формате json</td></tr>
+    <tr><td>any method</td><td>/employee/remove?id={empId}</td><td>Удаляет существующего работника с данным id</td></tr>
+    <tr><td>post method</td><td>/employee/update</td><td>Изменяет информацию о существующем работнике<br> на информацию в теле запроса в формате json</td></tr>
+
+</table>
+</p>
+
+</body>
+</html>
