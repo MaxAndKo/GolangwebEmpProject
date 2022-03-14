@@ -116,9 +116,11 @@ func createEmp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = db.Exec(fmt.Sprintf("INSERT INTO passports VALUES ('%s', '%s', %d)", emp.EmpPassport.Number, emp.EmpPassport.Type, id))
+	query = fmt.Sprintf("INSERT INTO passports VALUES ('%s', '%s', %d)", emp.EmpPassport.Number, emp.EmpPassport.Type, id)
+	_, err = db.Exec(query)
 	if err != nil {
-		log.Println("Ошибка при добавлении паспорта")
+		log.Print("Ошибка при добавлении паспорта:")
+		log.Println(err)
 		http.Error(w, "Неправильный формат тела запроса", 420)
 		return
 	}
@@ -141,9 +143,10 @@ func removeEmp(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	_, err = db.Exec(fmt.Sprintf("DELETE INTO employees WHERE id = %d", id))
+	_, err = db.Exec(fmt.Sprintf("DELETE FROM employees WHERE id = %d", id))
 	if err != nil {
-		log.Println("Ошибка при удалении рабочего")
+		log.Print("Ошибка при удалении рабочего: ")
+		log.Println(err)
 		http.NotFound(w, r)
 	} else {
 		fmt.Fprintf(w, "Рабочий был успешно удален")
