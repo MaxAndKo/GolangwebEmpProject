@@ -8,13 +8,11 @@
     <title>Home</title>
     <style>
         body{
-            text-align: center;
             font-family: Arial;
         }
         table{
             margin: auto;
-            border-collapse: collapse;
-            text-align: center;
+
         }
         tr, td{
             border: 1px solid black
@@ -24,9 +22,10 @@
 </head>
 <body>
 
-<p>Домашняя страница</p>
+<p style="text-align: center">Домашняя страница</p>
 <p>
-    <table>
+    <table style="border-collapse: collapse;
+            text-align: center;">
     <tr><td>any method</td><td>/employee?id={empId}</td><td>Выводит работника с данным id</td></tr>
     <tr><td>any method</td><td>/employee/list  </td><td>Выводит псписок всех работников</td></tr>
     <tr><td>post method</td><td>/employee/create</td><td>Создает нового работника из информации<br> в теле запроса в формате json</td></tr>
@@ -35,6 +34,34 @@
 
 </table>
 </p>
+<table style="text-align: left">
+    <tr style="border: 0px">
+        <td style="border: 0px">
+    Пример json:<br>
+    {<br>
+    "Id":1,(требуется только при изменении работника)<br>
+    "Name":"SomeName",<br>
+    "Surname":"SomeSurname",<br>
+    "Phone":"+12345678910",<br>
+    "CompanyId":1,<br>
+    "EmpPassport":{<br>
+    "Type":"Passport RF",<br>
+    "Number":"1246785317"<br>
+    },<br>
+    "EmpDepartment":{<br>
+    "Name":"Administration"(Выбор осуществляется только из существующих)<br>
+    <br>
+    }
+        </td>
+    </tr>
+</table>
 
+<p style="text-align: center">
+    Существующие департаменты:<br>
+    IT<br>
+    Sales<br>
+    Administration<br>
+    Accounting
+</p>
 </body>
 </html>
