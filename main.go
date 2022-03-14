@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	_ "github.com/lib/pq"
 	"log"
 	"net/http"
@@ -30,11 +31,12 @@ func checkTables(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	_, err = db.Exec("CREATE TABLE IF NOT EXISTS public.departments\n(\n name character varying(20) COLLATE pg_catalog.\"default\" NOT NULL,\n phone character varying(12) COLLATE pg_catalog.\"default\",\n CONSTRAINT departments_pkey PRIMARY KEY (name)\n)")
+	_, err = db.Exec("CREATE TABLE IF NOT EXISTS public.departments( name character varying(20) COLLATE pg_catalog.\"default\" NOT NULL, phone character varying(12) COLLATE pg_catalog.\"default\", CONSTRAINT departments_pkey PRIMARY KEY (name))")
 	if err != nil {
 		log.Println("Ошибка создания таблицы департаментов")
 		http.Error(w, "Внутрення ошибка сервера", 500)
 	}
+	fmt.Fprintf(w, "Таблица создана")
 }
 
 func main() {
