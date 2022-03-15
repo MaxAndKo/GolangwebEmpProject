@@ -165,7 +165,7 @@ func CreateEmp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Write([]byte(fmt.Sprintf("Зарегестрирован рабочий c id %d", id)))
+	w.Write([]byte(fmt.Sprintf("Зарегистрирован рабочий c id %d", id)))
 
 }
 
